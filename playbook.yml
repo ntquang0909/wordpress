@@ -1,0 +1,72 @@
+---
+# This Ansible playbook configures and deploys a WordPress site on the instances.
+# It should be run on the EC2 instances after they are launched by Terraform.
+- name: Deploy Highly Available WordPress
+  hosts: all
+  become: yes
+  vars:
+    # Variables for the EFS mount and RDS connection
+    efs_dns_name: ""
+    rds_endpoint: ""
+
+    # WordPress variables
+    web_root_path: "/var/www/html"
+    wp_content_path: "{{ web_root_path }}/wp-content"
+
+    # Database variables
+    db_name: "{{ hostvars[inventory_hostname]['db_name'] | default('wordpressdb') }}"
+    db_user: "{{ hostvars[inventory_hostname]['db_username'] | default('admin') }}"
+    db_password: "{{ hostvars[inventory_hostname]['db_password'] | default('your_secure_password') }}"
+
+  tasks:
+    - name: Update apt cache and install required packages
+      apt:
+        name:
+          - apache2
+          - php
+          - libapache2-mod-php
+          - php-mysql
+          - php-curl
+          - php-gd
+          - php-mbstring
+          - php-xml
+          - php-xmlrpc
+          - nfs-common
+        state: present
+
+    - name: Mount EFS filesystem to the wp-content directory
+      mount:
+        src: "{{ efs_dns_name }}:/"
+        path: "{{ wp_content_path }}"
+        fstype: nfs
+        state: mounted
+
+    - name: Download and unarchive WordPress
+      unarchive:
+        src: "https://wordpress.org/latest.tar.gz"
+        dest: /tmp
+        remote_src: yes
+        creates: /tmp/wordpress/index.php
+
+    - name: Move WordPress files to web root
+      shell: "mv /tmp/wordpress/* {{ web_root_path }}/"
+      args:
+        creates: "{{ web_root_path }}/index.php"
+
+    - name: Set correct permissions on web root
+      file:
+        path: "{{ web_root_path }}"
+        owner: www-data
+        group: www-data
+        recurse: yes
+        state: directory
+
+    - name: Create wp-config.php from template
+      template:
+        src: wp-config.php.j2
+        dest: "{{ web_root_path }}/wp-config.php"
+
+    - name: Restart Apache to apply changes
+      systemd:
+        name: apache2
+        state: restarted
