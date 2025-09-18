@@ -5,4 +5,4 @@ The Terraform `main.tf` and `variables.tf` files will set up the core infrastruc
 
 To run the Ansible playbook, you would need to export the database and cache connection details as environment variables and run it from the Bastion Host. This is a secure approach as it avoids storing sensitive information directly in the Ansible files.
 
-In more details, please see `Highly Available WordPress on AWS.pdf`
+In more details, please see `architecture.png` and `Highly Available WordPress on AWS.pdf`
